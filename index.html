@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SNBD HOST Expense Report Generator</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://unpkg.com/jspdf@2.5.1/dist/fonts/NotoSansBengali-Regular.js"></script>
+  <style>
+    body { background: #18191a; color: #fff; }
+    .form-label { color: #ff4d4f; }
+    .btn-danger, .btn-danger:focus { background: #ff4d4f; border: none; }
+    .btn-danger:hover { background: #d9363e; }
+    .btn-success { background: #21c55d; border: none; }
+    .btn-success:hover { background: #16a34a; }
+    .table-dark th, .table-dark td { color: #fff; }
+    .fst-italic.text-danger { font-size: 0.95em; }
+  </style>
+</head>
+<body class="p-4">
+  <div class="container">
+    <h2 class="text-center text-danger mb-4">SNBD HOST Expense Report</h2>
+    <form id="expenseForm">
+      <div class="row mb-3">
+        <div class="col-md-4 mb-2">
+          <label class="form-label">Expense For</label>
+          <select class="form-control" id="expenseFor" required>
+            <option value="">Select</option>
+            <option value="VPS">VPS</option>
+            <option value="LICENSE">License</option>
+            <option value="FUND">Fund</option>
+          </select>
+        </div>
+        <div class="col-md-4 mb-2" id="providerRow" style="display:none;">
+          <label class="form-label">Parent Company / Provider</label>
+          <input type="text" class="form-control" id="provider">
+        </div>
+        <div class="col-md-4 mb-2" id="otherDetailsRow" style="display:none;">
+          <label class="form-label">Other Expense Details <span class="fst-italic text-danger">(Please write any domain panel information if required. If not, type 'No')</span></label>
+          <input type="text" class="form-control" id="otherDetails">
+        </div>
+      </div>
+      <div id="expensesList">
+        <div class="row mb-3 expense-row">
+          <div class="col-md-3 mb-2">
+            <label class="form-label">Amount</label>
+            <input type="number" step="0.01" class="form-control amount" required>
+          </div>
+          <div class="col-md-3 mb-2">
+            <label class="form-label">Currency</label>
+            <select class="form-control currency">
+              <option value="USD">USD</option>
+              <option value="BDT">BDT</option>
+              <option value="CAD">CAD</option>
+              <option value="EURO">EURO</option>
+            </select>
+          </div>
+          <div class="col-md-2 mb-2 d-flex align-items-end">
+            <button type="button" class="btn btn-danger remove-expense w-100" style="display:none;">Remove</button>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn btn-secondary mb-3" id="addExpense">Add Expense</button>
+      <div class="mb-3">
+        <label class="fw-bold">Total Amount: <span id="totalDisplay">0.00</span></label>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" id="description" rows="3" required>
+This purchase has been done by SNBD HOST Credit Card or PayPal or Cash (BDT). This information is being saved for tax purposes.
+
+এই ক্রয়টি SNBD HOST এর ক্রেডিট কার্ড, পেপ্যাল বা নগদ (BDT) এর মাধ্যমে সম্পন্ন হয়েছে। এই তথ্যটি কর সংক্রান্ত কাজে ব্যবহারের জন্য সংরক্ষিত হচ্ছে।
+        </textarea>
+      </div>
+      <div class="row mb-3">
+        <div class="col-md-4 mb-2">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-control" id="date" required>
+        </div>
+        <div class="col-md-4 mb-2">
+          <label class="form-label">Paid By</label>
+          <input type="text" class="form-control" id="paidBy" required>
+        </div>
+        <div class="col-md-4 mb-2">
+          <label class="form-label">Approved By</label>
+          <select class="form-control" id="approvedBy" required>
+            <option value="YEAMIN ADIB - WISE ACCOUNT HOLDER" selected>YEAMIN ADIB - WISE ACCOUNT HOLDER</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-danger w-100 mb-2">Generate PDF & Send</button>
+    </form>
+    <div id="errorMsg" class="alert alert-danger mt-3 d-none"></div>
+    <!-- Thank You Modal -->
+    <div class="modal fade" id="thankYouModal" tabindex="-1" aria-labelledby="thankYouModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white">
+          <div class="modal-header border-0">
+            <h5 class="modal-title" id="thankYouModalLabel">Thank You!</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body text-center">
+            Thank you for your submission.
+          </div>
+          <div class="modal-footer border-0">
+            <button type="button" class="btn btn-success w-100" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+    const firebaseConfig = {
+      apiKey: "AIzaSyCP7u65MH9Qs1l-JG8l-ZNBbVCNJIapV8Q",
+      authDomain: "snbdhostexpensecalc.firebaseapp.com",
+      projectId: "snbdhostexpensecalc",
+      storageBucket: "snbdhostexpensecalc.appspot.com",
+      messagingSenderId: "750930955379",
+      appId: "1:750930955379:web:a093f724b7947536daae06",
+      measurementId: "G-FVT8PP2KGE"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    // Conditional fields
+    document.getElementById('expenseFor').addEventListener('change', function () {
+      const value = this.value;
+      document.getElementById('providerRow').style.display = value === 'VPS' ? 'block' : 'none';
+      document.getElementById('otherDetailsRow').style.display = value === 'FUND' ? 'block' : 'none';
+    });
+    // Add/Remove expense rows
+    function updateTotal() {
+      const amounts = document.querySelectorAll('.amount');
+      const currencies = document.querySelectorAll('.currency');
+      let sum = 0;
+      let currency = '';
+      amounts.forEach((input, i) => {
+        const val = parseFloat(input.value);
+        if (!isNaN(val)) {
+          sum += val;
+          currency = currencies[i].value;
+        }
+      });
+      document.getElementById('totalDisplay').textContent = (currency ? currency + ' ' : '') + sum.toFixed(2);
+    }
+    document.getElementById('addExpense').addEventListener('click', () => {
+      const row = document.createElement('div');
+      row.classList.add('row', 'mb-3', 'expense-row');
+      row.innerHTML = `
+        <div class="col-md-3 mb-2">
+          <input type="number" step="0.01" class="form-control amount" required placeholder="Amount">
+        </div>
+        <div class="col-md-3 mb-2">
+          <select class="form-control currency">
+            <option value="USD">USD</option>
+            <option value="BDT">BDT</option>
+            <option value="CAD">CAD</option>
+            <option value="EURO">EURO</option>
+          </select>
+        </div>
+        <div class="col-md-2 mb-2 d-flex align-items-end">
+          <button type="button" class="btn btn-danger remove-expense w-100">Remove</button>
+        </div>`;
+      document.getElementById('expensesList').appendChild(row);
+      row.querySelector('.amount').addEventListener('input', updateTotal);
+      row.querySelector('.currency').addEventListener('change', updateTotal);
+      row.querySelector('.remove-expense').addEventListener('click', () => {
+        row.remove();
+        updateTotal();
+      });
+      // Show remove button for all rows except the first
+      document.querySelectorAll('.remove-expense').forEach(btn => btn.style.display = 'block');
+    });
+    document.querySelectorAll('.amount').forEach(el => el.addEventListener('input', updateTotal));
+    document.querySelectorAll('.currency').forEach(el => el.addEventListener('change', updateTotal));
+    // PDF generation
+    document.getElementById('expenseForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFont("NotoSansBengali");
+      const invoiceNumber = 'SNBD-' + Math.floor(100000 + Math.random() * 900000);
+      const timestamp = new Date().toLocaleString();
+      const expenseFor = document.getElementById('expenseFor').value;
+      const provider = document.getElementById('provider').value;
+      const otherDetails = document.getElementById('otherDetails').value;
+      const description = document.getElementById('description').value;
+      const date = document.getElementById('date').value;
+      const paidBy = document.getElementById('paidBy').value;
+      const approvedBy = document.getElementById('approvedBy').value;
+      const amounts = document.querySelectorAll('.amount');
+      const currencies = document.querySelectorAll('.currency');
+      let total = 0;
+      let lineY = 60;
+      doc.setFontSize(18);
+      doc.setTextColor(200, 0, 0);
+      doc.text("SNBD HOST Expense Report", 20, 20);
+      doc.setFontSize(12);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`Invoice Number: ${invoiceNumber}`, 20, 30);
+      doc.text(`Created: ${timestamp}`, 20, 40);
+      doc.text(`Expense For: ${expenseFor}` + (expenseFor === 'VPS' ? ` (Provider: ${provider})` : ''), 20, 50);
+      if (expenseFor === 'FUND') {
+        doc.text(`Other Details: ${otherDetails}`, 20, lineY);
+        lineY += 10;
+      }
+      for (let i = 0; i < amounts.length; i++) {
+        const amt = parseFloat(amounts[i].value);
+        const cur = currencies[i].value;
+        if (!isNaN(amt)) {
+          total += amt;
+          doc.text(`Expense ${i + 1}: ${cur} ${amt.toFixed(2)}`, 20, lineY);
+          lineY += 10;
+        }
+      }
+      const descriptionLines = doc.splitTextToSize(`Description: ${description}`, 170);
+      descriptionLines.forEach(line => {
+        doc.text(line, 20, lineY);
+        lineY += 7;
+      });
+      doc.text(`Date: ${date}`, 20, lineY);
+      lineY += 10;
+      doc.text(`Paid By: ${paidBy}`, 20, lineY);
+      lineY += 10;
+      doc.text(`Approved By: ${approvedBy}`, 20, lineY);
+      lineY += 10;
+      doc.setDrawColor(200, 0, 0);
+      doc.line(20, lineY, 190, lineY);
+      lineY += 10;
+      doc.setFontSize(14);
+      let totalCurrency = currencies[0] ? currencies[0].value : '';
+      doc.text(`Total Amount: ${totalCurrency} ${total.toFixed(2)}`, 20, lineY);
+      lineY += 20;
+      doc.text("Authorized Signature: ______________________", 20, lineY);
+      doc.save(`${invoiceNumber}.pdf`);
+      // Save to Firebase
+      const expenseData = {
+        invoiceNumber,
+        timestamp,
+        expenseFor,
+        provider,
+        otherDetails,
+        description,
+        date,
+        paidBy,
+        approvedBy,
+        expenses: Array.from(amounts).map((el, i) => ({ amount: parseFloat(el.value), currency: currencies[i].value })),
+        total
+      };
+      try {
+        await addDoc(collection(db, 'expenses'), expenseData);
+        document.getElementById('errorMsg').classList.add('d-none');
+        const thankYouModal = new bootstrap.Modal(document.getElementById('thankYouModal'));
+        thankYouModal.show();
+        document.getElementById('thankYouModal').addEventListener('hidden.bs.modal', function handler() {
+          document.getElementById('expenseForm').reset();
+          // Remove all but the first expense row
+          document.querySelectorAll('.expense-row').forEach((row, idx) => { if (idx > 0) row.remove(); });
+          updateTotal();
+          document.getElementById('thankYouModal').removeEventListener('hidden.bs.modal', handler);
+        });
+      } catch (err) {
+        document.getElementById('errorMsg').textContent = 'Error submitting expense: ' + err.message;
+        document.getElementById('errorMsg').classList.remove('d-none');
+        setTimeout(() => {
+          document.getElementById('errorMsg').classList.add('d-none');
+        }, 4000);
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
