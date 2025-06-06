@@ -7,8 +7,21 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-dark text-white p-5">
-  <div class="container">
-    <h2 class="text-center text-danger mb-4">SNBD HOST Expense Admin Panel</h2>
+  <div id="loginContainer" class="container" style="max-width: 400px;">
+    <h2 class="text-center text-danger mb-3">Admin Login</h2>
+    <div class="mb-3">
+      <input type="password" id="adminPassword" class="form-control" placeholder="Password">
+    </div>
+    <button id="loginBtn" class="btn btn-danger w-100">Login</button>
+    <p id="loginError" class="text-danger mt-2 d-none">Invalid password</p>
+  </div>
+
+  <div id="adminContainer" class="container d-none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="text-danger m-0">SNBD HOST Expense Admin Panel</h2>
+      <button id="logoutBtn" class="btn btn-outline-light btn-sm">Logout</button>
+    </div>
+    <input type="text" id="searchInput" class="form-control mb-3" placeholder="Search...">
     <div id="expensesContainer">
       <p>Loading expenses...</p>
     </div>
@@ -60,8 +73,7 @@
   </div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
-    import { addDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, orderBy, limit, addDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
     import { jsPDF } from "jspdf";
     import "jspdf/dist/jspdf.umd.min.js";
     import "jspdf/dist/fonts/NotoSansBengali-Regular.js";
@@ -88,7 +100,7 @@
           container.innerHTML = '<p>No expenses found.</p>';
           return;
         }
-        let html = '<div class="table-responsive"><table class="table table-bordered table-dark table-striped">';
+        let html = '<div class="table-responsive"><table id="expensesTable" class="table table-bordered table-dark table-striped">';
         html += '<thead><tr><th>Expense For</th><th>Amount</th><th>Currency</th><th>Description</th><th>Date</th><th>Paid By</th><th>Approved By</th><th>Timestamp</th><th>Actions</th></tr></thead><tbody>';
         snapshot.forEach(doc => {
           const d = doc.data();
@@ -103,17 +115,55 @@
             <td>${d.timestamp ? new Date(d.timestamp).toLocaleString() : ''}</td>
             <td>
               <button class="btn btn-sm btn-danger mb-1" onclick="downloadPDF('${doc.id.replace(/'/g, '\'')}', ${encodeURIComponent(JSON.stringify(d))})">Download PDF</button>
-              <button class="btn btn-sm btn-secondary" onclick="openEditModal('${doc.id.replace(/'/g, '\'')}', ${encodeURIComponent(JSON.stringify(d))})">Edit</button>
+              <button class="btn btn-sm btn-secondary mb-1" onclick="openEditModal('${doc.id.replace(/'/g, '\'')}', ${encodeURIComponent(JSON.stringify(d))})">Edit</button>
+              <button class="btn btn-sm btn-warning" onclick="deleteExpense('${doc.id.replace(/'/g, '\'')}')">Delete</button>
             </td>
           </tr>`;
         });
         html += '</tbody></table></div>';
         container.innerHTML = html;
+        applySearch();
       } catch (err) {
         container.innerHTML = '<p class="text-danger">Error loading expenses: ' + err.message + '</p>';
       }
     }
-    window.onload = loadExpenses;
+    function applySearch() {
+      const filter = document.getElementById('searchInput').value.toLowerCase();
+      document.querySelectorAll('#expensesTable tbody tr').forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(filter) ? '' : 'none';
+      });
+    }
+    document.getElementById('searchInput').addEventListener('input', applySearch);
+
+    function checkLogin() {
+      if (localStorage.getItem('adminLoggedIn') === 'true') {
+        document.getElementById('loginContainer').classList.add('d-none');
+        document.getElementById('adminContainer').classList.remove('d-none');
+        loadExpenses();
+      } else {
+        document.getElementById('adminContainer').classList.add('d-none');
+        document.getElementById('loginContainer').classList.remove('d-none');
+      }
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', function() {
+      const pw = document.getElementById('adminPassword').value;
+      if (pw === 'admin123') {
+        localStorage.setItem('adminLoggedIn', 'true');
+        document.getElementById('loginError').classList.add('d-none');
+        checkLogin();
+      } else {
+        document.getElementById('loginError').classList.remove('d-none');
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', function() {
+      localStorage.removeItem('adminLoggedIn');
+      checkLogin();
+    });
+
+    window.onload = checkLogin;
 
     document.getElementById('expenseForm').addEventListener('submit', async function (e) {
       e.preventDefault();
@@ -237,6 +287,16 @@
         alert('Error updating expense: ' + err.message);
       }
     });
+
+    window.deleteExpense = async function(docId) {
+      if (!confirm('Delete this expense?')) return;
+      try {
+        await deleteDoc(doc(db, 'expenses', docId));
+        loadExpenses();
+      } catch (err) {
+        alert('Error deleting expense: ' + err.message);
+      }
+    };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
