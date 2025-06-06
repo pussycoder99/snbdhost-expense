@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SNBD HOST Admin Panel</title>
+  <title>Admin Login</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-dark text-white p-5">
-  <div id="loginOverlay" class="position-fixed top-0 start-0 vw-100 vh-100 bg-dark d-flex justify-content-center align-items-center" style="display:none; z-index:1050;">
+  <div class="d-flex justify-content-center align-items-center vh-100">
     <div class="card bg-secondary p-4" style="min-width:300px;">
       <h5 class="text-center mb-3">Admin Login</h5>
       <div class="mb-2">
@@ -20,145 +20,13 @@
       <button class="btn btn-danger w-100" id="loginBtn">Login</button>
     </div>
   </div>
-  <div class="container" id="adminContent" style="display:none;">
-    <h2 class="text-center text-danger mb-4">SNBD HOST Expense Admin Panel</h2>
-    <div id="expensesContainer">
-      <p>Loading expenses...</p>
-    </div>
-    <!-- Edit Modal -->
-    <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content bg-dark text-white">
-          <div class="modal-header border-0">
-            <h5 class="modal-title" id="editModalLabel">Edit Expense</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <form id="editExpenseForm">
-              <input type="hidden" id="editDocId">
-              <div class="mb-2">
-                <label class="form-label">Expense For</label>
-                <input type="text" class="form-control" id="editExpenseFor" required>
-              </div>
-              <div class="mb-2">
-                <label class="form-label">Amount</label>
-                <input type="number" step="0.01" class="form-control" id="editAmount" required>
-              </div>
-              <div class="mb-2">
-                <label class="form-label">Currency</label>
-                <input type="text" class="form-control" id="editCurrency" required>
-              </div>
-              <div class="mb-2">
-                <label class="form-label">Description</label>
-                <textarea class="form-control" id="editDescription" rows="2" required></textarea>
-              </div>
-              <div class="mb-2">
-                <label class="form-label">Date</label>
-                <input type="date" class="form-control" id="editDate" required>
-              </div>
-              <div class="mb-2">
-                <label class="form-label">Paid By</label>
-                <input type="text" class="form-control" id="editPaidBy" required>
-              </div>
-              <div class="mb-2">
-                <label class="form-label">Approved By</label>
-                <input type="text" class="form-control" id="editApprovedBy" required>
-              </div>
-              <button type="submit" class="btn btn-danger w-100 mt-2">Save Changes</button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, orderBy, limit, startAfter, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyCP7u65MH9Qs1l-JG8l-ZNBbVCNJIapV8Q",
-      authDomain: "snbdhostexpensecalc.firebaseapp.com",
-      projectId: "snbdhostexpensecalc",
-      storageBucket: "snbdhostexpensecalc.firebasestorage.app",
-      messagingSenderId: "750930955379",
-      appId: "1:750930955379:web:a093f724b7947536daae06",
-      measurementId: "G-FVT8PP2KGE"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    let lastDoc = null;
-    const LIMIT = 20;
-
-    async function loadExpenses() {
-      const container = document.getElementById('expensesContainer');
-      const wrapperId = 'loadMoreWrapper';
-      try {
-        let q = query(collection(db, 'expenses'), orderBy('timestamp', 'desc'), limit(LIMIT));
-        if (lastDoc) {
-          q = query(collection(db, 'expenses'), orderBy('timestamp', 'desc'), startAfter(lastDoc), limit(LIMIT));
-        }
-        const snapshot = await getDocs(q);
-        if (snapshot.empty && !lastDoc) {
-          container.innerHTML = '<p>No expenses found.</p>';
-          return;
-        }
-        if (!document.getElementById('expensesTableBody')) {
-          let html = '<div class="table-responsive"><table class="table table-bordered table-dark table-striped">';
-          html += '<thead><tr><th>Expense For</th><th>Amount</th><th>Currency</th><th>Description</th><th>Date</th><th>Paid By</th><th>Approved By</th><th>Timestamp</th><th>Actions</th></tr></thead><tbody id="expensesTableBody"></tbody></table></div><div class="text-center mt-3" id="' + wrapperId + '"></div>';
-          container.innerHTML = html;
-        }
-        const tbody = document.getElementById('expensesTableBody');
-        snapshot.forEach(doc => {
-          const d = doc.data();
-          const ts = d.timestamp && d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000).toLocaleString() : (d.timestamp ? new Date(d.timestamp).toLocaleString() : '');
-          const row = document.createElement('tr');
-          row.innerHTML = `<td>${d.expenseFor || ''}</td>
-            <td>${d.expenses ? d.expenses.map(e => e.amount).join('<br>') : (d.amount != null ? d.amount : '')}</td>
-            <td>${d.expenses ? d.expenses.map(e => e.currency).join('<br>') : (d.currency || '')}</td>
-            <td>${d.description || ''}</td>
-            <td>${d.date || ''}</td>
-            <td>${d.paidBy || ''}</td>
-            <td>${d.approvedBy || ''}</td>
-            <td>${ts}</td>
-            <td>
-              <button class="btn btn-sm btn-danger mb-1" onclick="downloadPDF('${doc.id}', ${encodeURIComponent(JSON.stringify(d))})">Download PDF</button>
-              <button class="btn btn-sm btn-secondary" onclick="openEditModal('${doc.id}', ${encodeURIComponent(JSON.stringify(d))})">Edit</button>
-            </td>`;
-          tbody.appendChild(row);
-        });
-        if (snapshot.docs.length > 0) {
-          lastDoc = snapshot.docs[snapshot.docs.length - 1];
-        }
-        const loadMoreWrapper = document.getElementById(wrapperId);
-        if (snapshot.docs.length < LIMIT) {
-          loadMoreWrapper.innerHTML = '';
-        } else {
-          loadMoreWrapper.innerHTML = '<button class="btn btn-secondary" id="loadMoreBtn">Load More</button>';
-          document.getElementById('loadMoreBtn').onclick = loadExpenses;
-        }
-      } catch (err) {
-        container.innerHTML = '<p class="text-danger">Error loading expenses: ' + err.message + '</p>';
-      }
-    }
-
+  <script>
     const ADMIN_USER = 'admin';
     const ADMIN_PASS = 'yeaminadib';
 
-    function showLogin() {
-      document.getElementById('loginOverlay').style.display = 'flex';
-    }
-
-    function hideLogin() {
-      document.getElementById('loginOverlay').style.display = 'none';
-    }
-
-    function init() {
+    function redirectIfAuthenticated() {
       if (localStorage.getItem('adminAuth') === 'true') {
-        document.getElementById('adminContent').style.display = 'block';
-        loadExpenses();
-      } else {
-        showLogin();
+        window.location.href = 'dashboard.html';
       }
     }
 
@@ -167,114 +35,13 @@
       const pass = document.getElementById('adminPass').value;
       if (user === ADMIN_USER && pass === ADMIN_PASS) {
         localStorage.setItem('adminAuth', 'true');
-        document.getElementById('adminContent').style.display = 'block';
-        document.getElementById('loginError').classList.add('d-none');
-        hideLogin();
-        loadExpenses();
+        window.location.href = 'dashboard.html';
       } else {
         document.getElementById('loginError').classList.remove('d-none');
       }
     });
 
-    window.onload = init;
-
-
-    // Download PDF function
-    window.downloadPDF = async function(docId, encodedData) {
-      if (!window.jspdf) {
-        await Promise.all([
-          new Promise(r => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; s.onload = r; document.head.appendChild(s); }),
-          new Promise(r => { const s = document.createElement('script'); s.src = 'https://unpkg.com/jspdf@2.5.1/dist/fonts/NotoSansBengali-Regular.js'; s.onload = r; document.head.appendChild(s); })
-        ]);
-      }
-      const d = JSON.parse(decodeURIComponent(encodedData));
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.setFont("NotoSansBengali");
-      let lineY = 60;
-      doc.setFontSize(18);
-      doc.setTextColor(200, 0, 0);
-      doc.text("SNBD HOST Expense Report", 20, 20);
-      doc.setFontSize(12);
-      doc.setTextColor(255, 255, 255);
-      doc.text(`Invoice Number: ${d.invoiceNumber || ''}`, 20, 30);
-      doc.text(`Created: ${d.timestamp || ''}`, 20, 40);
-      doc.text(`Expense For: ${d.expenseFor || ''}`, 20, 50);
-      if (d.provider) {
-        doc.text(`Provider: ${d.provider}`, 20, lineY);
-        lineY += 10;
-      }
-      if (d.otherDetails) {
-        doc.text(`Other Details: ${d.otherDetails}`, 20, lineY);
-        lineY += 10;
-      }
-      if (d.expenses && Array.isArray(d.expenses)) {
-        d.expenses.forEach((e, i) => {
-          doc.text(`Expense ${i + 1}: ${e.currency} ${e.amount.toFixed(2)}`, 20, lineY);
-          lineY += 10;
-        });
-      } else if (d.amount && d.currency) {
-        doc.text(`Expense: ${d.currency} ${d.amount.toFixed(2)}`, 20, lineY);
-        lineY += 10;
-      }
-      const descriptionLines = doc.splitTextToSize(`Description: ${d.description || ''}`, 170);
-      descriptionLines.forEach(line => {
-        doc.text(line, 20, lineY);
-        lineY += 7;
-      });
-      doc.text(`Date: ${d.date || ''}`, 20, lineY);
-      lineY += 10;
-      doc.text(`Paid By: ${d.paidBy || ''}`, 20, lineY);
-      lineY += 10;
-      doc.text(`Approved By: ${d.approvedBy || ''}`, 20, lineY);
-      lineY += 10;
-      doc.setDrawColor(200, 0, 0);
-      doc.line(20, lineY, 190, lineY);
-      lineY += 10;
-      doc.setFontSize(14);
-      doc.text(`Total Amount: ${(d.expenses && d.expenses[0] ? d.expenses[0].currency : d.currency) || ''} ${(d.total || d.amount || 0).toFixed(2)}`, 20, lineY);
-      lineY += 20;
-      doc.text("Authorized Signature: ______________________", 20, lineY);
-      doc.save(`${d.invoiceNumber || 'SNBD-' + Math.floor(100000 + Math.random() * 900000)}.pdf`);
-    };
-
-    // Edit modal logic
-    window.openEditModal = function(docId, encodedData) {
-      const d = JSON.parse(decodeURIComponent(encodedData));
-      document.getElementById('editDocId').value = docId;
-      document.getElementById('editExpenseFor').value = d.expenseFor || '';
-      document.getElementById('editAmount').value = d.amount != null ? d.amount : (d.expenses && d.expenses[0] ? d.expenses[0].amount : '');
-      document.getElementById('editCurrency').value = d.currency || (d.expenses && d.expenses[0] ? d.expenses[0].currency : '');
-      document.getElementById('editDescription').value = d.description || '';
-      document.getElementById('editDate').value = d.date || '';
-      document.getElementById('editPaidBy').value = d.paidBy || '';
-      document.getElementById('editApprovedBy').value = d.approvedBy || '';
-      const editModal = new bootstrap.Modal(document.getElementById('editModal'));
-      editModal.show();
-    };
-
-    document.getElementById('editExpenseForm').addEventListener('submit', async function (e) {
-      e.preventDefault();
-      const docId = document.getElementById('editDocId').value;
-      const updatedData = {
-        expenseFor: document.getElementById('editExpenseFor').value,
-        amount: parseFloat(document.getElementById('editAmount').value),
-        currency: document.getElementById('editCurrency').value,
-        description: document.getElementById('editDescription').value,
-        date: document.getElementById('editDate').value,
-        paidBy: document.getElementById('editPaidBy').value,
-        approvedBy: document.getElementById('editApprovedBy').value
-      };
-      try {
-        const docRef = doc(db, 'expenses', docId);
-        await updateDoc(docRef, updatedData);
-        const editModal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
-        editModal.hide();
-        loadExpenses();
-      } catch (err) {
-        alert('Error updating expense: ' + err.message);
-      }
-    });
+    window.onload = redirectIfAuthenticated;
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
