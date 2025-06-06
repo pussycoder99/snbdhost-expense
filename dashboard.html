@@ -152,10 +152,10 @@
       doc.setFont("NotoSansBengali");
       let lineY = 60;
       doc.setFontSize(18);
-      doc.setTextColor(200, 0, 0);
+      doc.setTextColor(200, 0, 0); // red heading
       doc.text("SNBD HOST Expense Report", 20, 20);
       doc.setFontSize(12);
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(0, 0, 0); // remaining text in black
       doc.text(`Invoice Number: ${d.invoiceNumber || ''}`, 20, 30);
       doc.text(`Created: ${d.timestamp || ''}`, 20, 40);
       doc.text(`Expense For: ${d.expenseFor || ''}`, 20, 50);
