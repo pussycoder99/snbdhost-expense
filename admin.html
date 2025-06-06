@@ -7,8 +7,20 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-dark text-white p-5">
-  <div class="container">
-    <h2 class="text-center text-danger mb-4">SNBD HOST Expense Admin Panel</h2>
+  <div id="loginContainer" class="container" style="max-width: 400px;">
+    <h2 class="text-center text-danger mb-3">Admin Login</h2>
+    <div class="mb-3">
+      <input type="password" id="adminPassword" class="form-control" placeholder="Password">
+    </div>
+    <button id="loginBtn" class="btn btn-danger w-100">Login</button>
+    <p id="loginError" class="text-danger mt-2 d-none">Invalid password</p>
+  </div>
+
+  <div id="adminContainer" class="container d-none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="text-danger m-0">SNBD HOST Expense Admin Panel</h2>
+      <button id="logoutBtn" class="btn btn-outline-light btn-sm">Logout</button>
+    </div>
     <input type="text" id="searchInput" class="form-control mb-3" placeholder="Search...">
     <div id="expensesContainer">
       <p>Loading expenses...</p>
@@ -123,7 +135,35 @@
       });
     }
     document.getElementById('searchInput').addEventListener('input', applySearch);
-    window.onload = loadExpenses;
+
+    function checkLogin() {
+      if (localStorage.getItem('adminLoggedIn') === 'true') {
+        document.getElementById('loginContainer').classList.add('d-none');
+        document.getElementById('adminContainer').classList.remove('d-none');
+        loadExpenses();
+      } else {
+        document.getElementById('adminContainer').classList.add('d-none');
+        document.getElementById('loginContainer').classList.remove('d-none');
+      }
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', function() {
+      const pw = document.getElementById('adminPassword').value;
+      if (pw === 'admin123') {
+        localStorage.setItem('adminLoggedIn', 'true');
+        document.getElementById('loginError').classList.add('d-none');
+        checkLogin();
+      } else {
+        document.getElementById('loginError').classList.remove('d-none');
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', function() {
+      localStorage.removeItem('adminLoggedIn');
+      checkLogin();
+    });
+
+    window.onload = checkLogin;
 
     document.getElementById('expenseForm').addEventListener('submit', async function (e) {
       e.preventDefault();
