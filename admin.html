@@ -73,7 +73,7 @@
   </div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, orderBy, limit, startAfter } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, orderBy, limit, startAfter, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCP7u65MH9Qs1l-JG8l-ZNBbVCNJIapV8Q",
@@ -266,8 +266,8 @@
         approvedBy: document.getElementById('editApprovedBy').value
       };
       try {
-        const docRef = collection(db, 'expenses');
-        await window.firebase.firestore().collection('expenses').doc(docId).update(updatedData);
+        const docRef = doc(db, 'expenses', docId);
+        await updateDoc(docRef, updatedData);
         const editModal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
         editModal.hide();
         loadExpenses();
