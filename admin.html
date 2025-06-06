@@ -7,7 +7,20 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-dark text-white p-5">
-  <div class="container">
+  <div id="loginOverlay" class="position-fixed top-0 start-0 vw-100 vh-100 bg-dark d-flex justify-content-center align-items-center" style="display:none; z-index:1050;">
+    <div class="card bg-secondary p-4" style="min-width:300px;">
+      <h5 class="text-center mb-3">Admin Login</h5>
+      <div class="mb-2">
+        <input type="text" id="adminUser" class="form-control" placeholder="Username">
+      </div>
+      <div class="mb-2">
+        <input type="password" id="adminPass" class="form-control" placeholder="Password">
+      </div>
+      <div class="text-danger mb-2 d-none" id="loginError">Invalid credentials</div>
+      <button class="btn btn-danger w-100" id="loginBtn">Login</button>
+    </div>
+  </div>
+  <div class="container" id="adminContent" style="display:none;">
     <h2 class="text-center text-danger mb-4">SNBD HOST Expense Admin Panel</h2>
     <div id="expensesContainer">
       <p>Loading expenses...</p>
@@ -60,11 +73,7 @@
   </div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
-    import { addDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
-    import { jsPDF } from "jspdf";
-    import "jspdf/dist/jspdf.umd.min.js";
-    import "jspdf/dist/fonts/NotoSansBengali-Regular.js";
+    import { getFirestore, collection, getDocs, query, orderBy, limit, startAfter } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCP7u65MH9Qs1l-JG8l-ZNBbVCNJIapV8Q",
@@ -78,77 +87,106 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    let lastDoc = null;
+    const LIMIT = 20;
 
     async function loadExpenses() {
       const container = document.getElementById('expensesContainer');
+      const wrapperId = 'loadMoreWrapper';
       try {
-        const q = query(collection(db, 'expenses'), orderBy('timestamp', 'desc'), limit(50));
+        let q = query(collection(db, 'expenses'), orderBy('timestamp', 'desc'), limit(LIMIT));
+        if (lastDoc) {
+          q = query(collection(db, 'expenses'), orderBy('timestamp', 'desc'), startAfter(lastDoc), limit(LIMIT));
+        }
         const snapshot = await getDocs(q);
-        if (snapshot.empty) {
+        if (snapshot.empty && !lastDoc) {
           container.innerHTML = '<p>No expenses found.</p>';
           return;
         }
-        let html = '<div class="table-responsive"><table class="table table-bordered table-dark table-striped">';
-        html += '<thead><tr><th>Expense For</th><th>Amount</th><th>Currency</th><th>Description</th><th>Date</th><th>Paid By</th><th>Approved By</th><th>Timestamp</th><th>Actions</th></tr></thead><tbody>';
+        if (!document.getElementById('expensesTableBody')) {
+          let html = '<div class="table-responsive"><table class="table table-bordered table-dark table-striped">';
+          html += '<thead><tr><th>Expense For</th><th>Amount</th><th>Currency</th><th>Description</th><th>Date</th><th>Paid By</th><th>Approved By</th><th>Timestamp</th><th>Actions</th></tr></thead><tbody id="expensesTableBody"></tbody></table></div><div class="text-center mt-3" id="' + wrapperId + '"></div>';
+          container.innerHTML = html;
+        }
+        const tbody = document.getElementById('expensesTableBody');
         snapshot.forEach(doc => {
           const d = doc.data();
-          html += `<tr>
-            <td>${d.expenseFor || ''}</td>
+          const ts = d.timestamp && d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000).toLocaleString() : (d.timestamp ? new Date(d.timestamp).toLocaleString() : '');
+          const row = document.createElement('tr');
+          row.innerHTML = `<td>${d.expenseFor || ''}</td>
             <td>${d.expenses ? d.expenses.map(e => e.amount).join('<br>') : (d.amount != null ? d.amount : '')}</td>
             <td>${d.expenses ? d.expenses.map(e => e.currency).join('<br>') : (d.currency || '')}</td>
             <td>${d.description || ''}</td>
             <td>${d.date || ''}</td>
             <td>${d.paidBy || ''}</td>
             <td>${d.approvedBy || ''}</td>
-            <td>${d.timestamp ? new Date(d.timestamp).toLocaleString() : ''}</td>
+            <td>${ts}</td>
             <td>
-              <button class="btn btn-sm btn-danger mb-1" onclick="downloadPDF('${doc.id.replace(/'/g, '\'')}', ${encodeURIComponent(JSON.stringify(d))})">Download PDF</button>
-              <button class="btn btn-sm btn-secondary" onclick="openEditModal('${doc.id.replace(/'/g, '\'')}', ${encodeURIComponent(JSON.stringify(d))})">Edit</button>
-            </td>
-          </tr>`;
+              <button class="btn btn-sm btn-danger mb-1" onclick="downloadPDF('${doc.id}', ${encodeURIComponent(JSON.stringify(d))})">Download PDF</button>
+              <button class="btn btn-sm btn-secondary" onclick="openEditModal('${doc.id}', ${encodeURIComponent(JSON.stringify(d))})">Edit</button>
+            </td>`;
+          tbody.appendChild(row);
         });
-        html += '</tbody></table></div>';
-        container.innerHTML = html;
+        if (snapshot.docs.length > 0) {
+          lastDoc = snapshot.docs[snapshot.docs.length - 1];
+        }
+        const loadMoreWrapper = document.getElementById(wrapperId);
+        if (snapshot.docs.length < LIMIT) {
+          loadMoreWrapper.innerHTML = '';
+        } else {
+          loadMoreWrapper.innerHTML = '<button class="btn btn-secondary" id="loadMoreBtn">Load More</button>';
+          document.getElementById('loadMoreBtn').onclick = loadExpenses;
+        }
       } catch (err) {
         container.innerHTML = '<p class="text-danger">Error loading expenses: ' + err.message + '</p>';
       }
     }
-    window.onload = loadExpenses;
 
-    document.getElementById('expenseForm').addEventListener('submit', async function (e) {
-      e.preventDefault();
-      const expenseFor = document.getElementById('expenseFor').value;
-      const amount = parseFloat(document.getElementById('amount').value);
-      const currency = document.getElementById('currency').value;
-      const description = document.getElementById('description').value;
-      const date = document.getElementById('date').value;
-      const paidBy = document.getElementById('paidBy').value;
-      const approvedBy = document.getElementById('approvedBy').value;
-      const timestamp = new Date().toISOString();
-      const expenseData = {
-        expenseFor,
-        amount,
-        currency,
-        description,
-        date,
-        paidBy,
-        approvedBy,
-        timestamp
-      };
-      try {
-        await addDoc(collection(db, 'expenses'), expenseData);
-        document.getElementById('successMsg').classList.remove('d-none');
-        document.getElementById('expenseForm').reset();
-        setTimeout(() => {
-          document.getElementById('successMsg').classList.add('d-none');
-        }, 2000);
-      } catch (err) {
-        alert('Error submitting expense: ' + err.message);
+    const ADMIN_USER = 'admin';
+    const ADMIN_PASS = 'yeaminadib';
+
+    function showLogin() {
+      document.getElementById('loginOverlay').style.display = 'flex';
+    }
+
+    function hideLogin() {
+      document.getElementById('loginOverlay').style.display = 'none';
+    }
+
+    function init() {
+      if (localStorage.getItem('adminAuth') === 'true') {
+        document.getElementById('adminContent').style.display = 'block';
+        loadExpenses();
+      } else {
+        showLogin();
+      }
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', () => {
+      const user = document.getElementById('adminUser').value.trim();
+      const pass = document.getElementById('adminPass').value;
+      if (user === ADMIN_USER && pass === ADMIN_PASS) {
+        localStorage.setItem('adminAuth', 'true');
+        document.getElementById('adminContent').style.display = 'block';
+        document.getElementById('loginError').classList.add('d-none');
+        hideLogin();
+        loadExpenses();
+      } else {
+        document.getElementById('loginError').classList.remove('d-none');
       }
     });
 
+    window.onload = init;
+
+
     // Download PDF function
-    window.downloadPDF = function(docId, encodedData) {
+    window.downloadPDF = async function(docId, encodedData) {
+      if (!window.jspdf) {
+        await Promise.all([
+          new Promise(r => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; s.onload = r; document.head.appendChild(s); }),
+          new Promise(r => { const s = document.createElement('script'); s.src = 'https://unpkg.com/jspdf@2.5.1/dist/fonts/NotoSansBengali-Regular.js'; s.onload = r; document.head.appendChild(s); })
+        ]);
+      }
       const d = JSON.parse(decodeURIComponent(encodedData));
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
