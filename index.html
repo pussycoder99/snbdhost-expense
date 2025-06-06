@@ -112,7 +112,7 @@ This purchase has been done by SNBD HOST Credit Card or PayPal or Cash (BDT). Th
   </div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
     const firebaseConfig = {
       apiKey: "AIzaSyCP7u65MH9Qs1l-JG8l-ZNBbVCNJIapV8Q",
       authDomain: "snbdhostexpensecalc.firebaseapp.com",
@@ -182,7 +182,8 @@ This purchase has been done by SNBD HOST Credit Card or PayPal or Cash (BDT). Th
       const doc = new jsPDF();
       doc.setFont("NotoSansBengali");
       const invoiceNumber = 'SNBD-' + Math.floor(100000 + Math.random() * 900000);
-      const timestamp = new Date().toLocaleString();
+      const timestamp = Timestamp.now();
+      const timestampLabel = new Date().toLocaleString();
       const expenseFor = document.getElementById('expenseFor').value;
       const provider = document.getElementById('provider').value;
       const otherDetails = document.getElementById('otherDetails').value;
@@ -195,12 +196,12 @@ This purchase has been done by SNBD HOST Credit Card or PayPal or Cash (BDT). Th
       let total = 0;
       let lineY = 60;
       doc.setFontSize(18);
-      doc.setTextColor(200, 0, 0);
+      doc.setTextColor(200, 0, 0); // red heading
       doc.text("SNBD HOST Expense Report", 20, 20);
       doc.setFontSize(12);
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(0, 0, 0); // remaining text in black
       doc.text(`Invoice Number: ${invoiceNumber}`, 20, 30);
-      doc.text(`Created: ${timestamp}`, 20, 40);
+      doc.text(`Created: ${timestampLabel}`, 20, 40);
       doc.text(`Expense For: ${expenseFor}` + (expenseFor === 'VPS' ? ` (Provider: ${provider})` : ''), 20, 50);
       if (expenseFor === 'FUND') {
         doc.text(`Other Details: ${otherDetails}`, 20, lineY);
